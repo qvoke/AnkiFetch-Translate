@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "AnkiFetch Translate",
+  "version": "0.1.0",
+  "description": "Translate selected text, save it to Anki, and highlight saved vocabulary.",
+  "permissions": ["storage", "contextMenus", "activeTab", "commands"],
+  "host_permissions": ["<all_urls>", "https://api-free.deepl.com/*", "https://api.mymemory.translated.net/*", "https://libretranslate.com/*", "http://127.0.0.1:8765/*"],
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "AnkiFetch Translate",
+    "default_popup": "src/popup.html"
+  },
+  "commands": {
+    "translate-selection": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y",
+        "mac": "MacCtrl+Shift+Y"
+      },
+      "description": "Translate selected text and add it to Anki"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content.js"],
+      "css": ["src/content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

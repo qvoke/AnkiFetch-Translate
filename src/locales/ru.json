@@ -1,0 +1,29 @@
+{
+  "title": "Переводчик Anki",
+  "refresh": "Обновить колоды и модели",
+  "translation": "Перевод",
+  "anki": "Anki",
+  "highlight": "Подсветка",
+  "translationProvider": "Переводчик",
+  "translatorApiKey": "API-ключ",
+  "translatorEndpoint": "Адрес переводчика",
+  "sourceLang": "Исходный язык",
+  "targetLang": "Целевой язык",
+  "translationTrigger": "Способ перевода",
+  "shortcutKey": "Горячая клавиша",
+  "ankiConnectUrl": "URL AnkiConnect",
+  "selectedDeck": "Основная колода",
+  "modelName": "Модель карточки",
+  "addOnlyIfUnique": "Добавлять, только если оригинала нет ни в одной колоде",
+  "allDecks": "Выбрать все колоды",
+  "highlightMode": "Показывать",
+  "highlightColor": "Цвет подсветки",
+  "highlightOpacity": "Прозрачность фона",
+  "siteWhitelist": "Белый список сайтов",
+  "siteBlacklist": "Чёрный список сайтов",
+  "options": {
+    "translationProvider": { "mymemory": "MyMemory (без ключа)", "deepl": "DeepL", "libretranslate": "LibreTranslate" },
+    "translationTrigger": { "selection": "Выделение текста", "double-click": "Двойной клик по выделенному тексту", "shortcut": "Горячая клавиша с выделенным текстом", "icon": "Иконка рядом с выделением" },
+    "highlightMode": { "original": "Только оригинал", "translation": "Только перевод", "both": "Оригинал и перевод" }
+  }
+}

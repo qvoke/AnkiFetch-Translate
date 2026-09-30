@@ -1,0 +1,36 @@
+.anki-translator-popup {
+  position: absolute;
+  z-index: 2147483647;
+  width: 300px;
+  padding: 14px;
+  border: 1px solid #d6dbe4;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 8px 30px rgba(20, 30, 50, 0.22);
+  color: #19202b;
+  font: 14px/1.4 system-ui, sans-serif;
+}
+
+.anki-translator-popup[data-theme="dark"] { border-color: #4d5665; background: #202631; color: #f1f4f8; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45); }
+.anki-translator-popup[data-theme="dark"] .anki-translator-original { color: #c4ccd7; }
+.anki-translator-popup[data-theme="dark"] select { border-color: #566171; background: #2b3442; color: #f1f4f8; }
+.anki-translator-popup[data-theme="dark"] .anki-translator-close { color: #d4dae3; }
+
+.anki-translator-original { color: #5a6574; margin: 8px 20px 10px 0; font-size: 16px; }
+.anki-translator-result { font-size: 23px; font-weight: 700; margin-bottom: 14px; }
+.anki-translator-close { position: absolute; top: 5px; right: 7px; border: 0; background: transparent; color: #687386; cursor: pointer; font-size: 23px; line-height: 1; }
+.anki-translator-languages { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+.anki-translator-languages select { min-width: 0; padding: 6px; border: 1px solid #cbd2de; border-radius: 5px; }
+.anki-translator-option { display: block; margin: 8px 0; font-size: 13px; }
+.anki-translator-option input { margin-right: 6px; }
+.anki-translator-deck-picker { position: relative; margin-top: 8px; }
+.anki-translator-deck-toggle { width: 100%; min-height: 0; margin: 0 0 10px; padding: 6px; border: 1px solid #cbd2de; border-radius: 5px; background: #fff; color: inherit; text-align: left; position: relative; font: inherit; }
+.anki-translator-deck-toggle::after { content: ""; position: absolute; right: 10px; top: 12px; width: 7px; height: 7px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(45deg); }
+.anki-translator-deck-menu { position: absolute; right: 0; left: 0; z-index: 2; display: none; max-height: 150px; overflow-y: auto; padding: 6px; border: 1px solid #cbd2de; border-radius: 5px; background: #fff; box-shadow: 0 5px 16px rgba(20, 30, 50, 0.2); }
+.anki-translator-deck-picker.open .anki-translator-deck-menu { display: grid; gap: 4px; }
+.anki-translator-deck-option { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.anki-translator-deck-option input { margin: 0; }
+.anki-translator-popup[data-theme="dark"] .anki-translator-deck-toggle, .anki-translator-popup[data-theme="dark"] .anki-translator-deck-menu { border-color: #566171; background: #2b3442; color: #f1f4f8; }
+.anki-translator-popup span, .anki-translator-error { display: block; margin-top: 8px; color: #a13a31; }
+.anki-translator-icon { position: absolute; z-index: 2147483647; width: 30px; height: 30px; padding: 0; border: 1px solid #cbd2de; border-radius: 50%; background: #ffffff; color: #2457d6; box-shadow: 0 3px 12px rgba(20, 30, 50, 0.2); cursor: pointer; font: 16px system-ui, sans-serif; }
+.anki-translator-highlight { border-radius: 3px; box-shadow: 0 0 0 1px rgba(120, 100, 30, 0.35); cursor: pointer; }

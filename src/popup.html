@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AnkiFetch Translate</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <header class="topbar">
+        <h1>AnkiFetch Translate</h1>
+        <div class="topbar-actions">
+          <div class="language-menu"><button id="languageButton" class="icon-button" type="button" title="Interface language" aria-label="Interface language">&#x1F310;</button><div id="languageMenuItems" class="language-list"><button type="button" data-language="en">English</button><button type="button" data-language="ru">Russian</button></div></div>
+          <button id="themeButton" class="icon-button" type="button" title="Toggle theme" aria-label="Toggle theme">&#x1F319;</button>
+        </div>
+      </header>
+
+      <fieldset><legend>Translation</legend>
+        <label>Provider <select id="translationProvider"><option value="mymemory">MyMemory (no key)</option><option value="deepl">DeepL</option><option value="libretranslate">LibreTranslate</option></select></label>
+        <label>API key <span class="key-input"><input id="translatorApiKey" type="password" placeholder="Paste your key if required"><button id="toggleApiKey" type="button" aria-label="Show API key">Show</button></span></label>
+        <div class="api-status-row"><span id="apiStatus"></span><button id="checkApi" type="button" aria-label="Check API status"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0 1 4"></path><path d="M20 5v6h-6"></path></svg></button></div>
+        <label>Custom endpoint <input id="translatorEndpoint" placeholder="Optional LibreTranslate endpoint"></label>
+        <div class="row"><label>Source language <select id="sourceLang"></select></label><label>Target language <select id="targetLang"></select></label></div>
+        <label>Translation trigger <select id="translationTrigger"><option value="selection">Text selection</option><option value="double-click">Double-click selected text</option><option value="shortcut">Keyboard shortcut with selected text</option><option value="icon">Translation icon near selection</option></select></label>
+        <label>Shortcut <input id="shortcutKey" placeholder="Ctrl+Shift+Y" autocomplete="off"></label>
+      </fieldset>
+
+      <fieldset><legend>Anki</legend>
+        <label>AnkiConnect URL <input id="ankiConnectUrl" value="http://127.0.0.1:8765"></label>
+        <label>Default deck <select id="selectedDeck"><option value="">Load decks</option></select></label>
+        <label>Card model <select id="modelName"><option value="">Load models</option></select></label>
+        <label class="check-row"><input id="addOnlyIfUnique" type="checkbox"> Add only if the original is not in any deck</label>
+        <button id="refreshAnki" type="button">Refresh decks and models</button>
+      </fieldset>
+
+      <fieldset><legend>Highlighting</legend>
+        <label>Decks to highlight</label><label class="check-row"><input id="allDecks" type="checkbox"> Select all decks</label><div id="deckChecklist" class="deck-checklist"></div>
+        <label>Show <select id="highlightMode"><option value="original">Original only</option><option value="translation">Translation only</option><option value="both">Original and translation</option></select></label>
+        <div class="row"><label>Highlight color <input id="highlightColor" type="color" value="#fff0a8"></label><label>Background opacity <input id="highlightOpacity" type="range" min="0.1" max="1" step="0.05" value="0.65"><span id="highlightOpacityValue">65%</span></label></div>
+      </fieldset>
+
+      <fieldset><legend>Site filtering</legend>
+        <label>Whitelist <textarea id="siteWhitelist" rows="3" placeholder="example.com&#10;docs.example.org"></textarea></label>
+        <label>Blacklist <textarea id="siteBlacklist" rows="3" placeholder="social.example.com"></textarea></label>
+        <p class="hint">Use one domain per line. A non-empty whitelist allows highlighting only on matching domains. Blacklist entries always take priority.</p>
+      </fieldset>
+
+      <p id="status" class="status"></p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
