@@ -4,6 +4,8 @@ const DEFAULTS = {
   translationProvider: "mymemory",
   translatorApiKey: "",
   translatorEndpoint: "",
+  translatorRegion: "",
+  translatorFolderId: "",
   ankiConnectUrl: "http://127.0.0.1:8765",
   modelName: "",
   addOnlyIfUnique: false,
@@ -12,12 +14,18 @@ const DEFAULTS = {
   selectedDeck: "",
   highlightDecks: [""],
   highlightMode: "both",
+  highlightWholeWords: false,
+  highlightEnabled: true,
   highlightColor: "#fff0a8",
   highlightOpacity: 0.65,
   translationTrigger: "selection",
-  shortcutKey: "Ctrl+Shift+Y",
+  showTranslationIcon: false,
+  shortcutModifier: "Y",
+  shortcutHoldDuration: 0,
+  requireShortcut: false,
   siteWhitelist: [],
   siteBlacklist: [],
+  siteFilteringOnlyHighlight: true,
   popupAddToAnki: false,
   theme: "light",
   interfaceLanguage: "en",
@@ -25,8 +33,14 @@ const DEFAULTS = {
 };
 
 const getSettings = async () => {
-  const settings = await chrome.storage.local.get(DEFAULTS);
-  return { ...DEFAULTS, ...settings };
+  const stored = await chrome.storage.local.get();
+  const settings = { ...DEFAULTS, ...stored };
+  if (stored.shortcutKey && (!Object.prototype.hasOwnProperty.call(stored, "shortcutModifier") || !stored.shortcutModifier)) {
+    const parts = stored.shortcutKey.split("+").map((part) => part.trim()).filter(Boolean);
+    const key = parts.pop() || "Y";
+    settings.shortcutModifier = [...parts, key].join("+");
+  }
+  return settings;
 };
 
 const ankiRequest = async (action, params = {}) => {
@@ -42,8 +56,10 @@ const ankiRequest = async (action, params = {}) => {
   return payload.result;
 };
 
-const translate = async (text, overrides = {}) => {
-  const settings = await getSettings();
+const translationCache = new Map();
+const translationRequests = new Map();
+
+const translateWithSettings = async (settings, text, overrides = {}) => {
   const provider = settings.translationProvider || "deepl";
   const targetLang = overrides.targetLang || settings.targetLang;
   const sourceLang = overrides.sourceLang ?? settings.sourceLang;
@@ -53,6 +69,40 @@ const translate = async (text, overrides = {}) => {
     const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${encodeURIComponent(pair)}`);
     if (!response.ok) throw new Error(`MyMemory HTTP ${response.status}`);
     return [(await response.json()).responseData?.translatedText || ""];
+  }
+  if (provider === "google") {
+    if (!apiKey) throw new Error("A Google Cloud API key is required. Add it in the extension settings.");
+    const response = await fetch(`https://translation.googleapis.com/language/translate/v2?key=${encodeURIComponent(apiKey)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ q: [text], target: targetLang.toLowerCase(), format: "text", ...(sourceLang ? { source: sourceLang.toLowerCase() } : {}) })
+    });
+    if (!response.ok) throw new Error(`Google Cloud Translation HTTP ${response.status}`);
+    return (await response.json()).data?.translations?.map((item) => item.translatedText).filter(Boolean) || [];
+  }
+  if (provider === "azure") {
+    if (!apiKey) throw new Error("An Azure Translator key is required. Add it in the extension settings.");
+    const endpoint = (settings.translatorEndpoint || "https://api.cognitive.microsofttranslator.com").replace(/\/$/, "");
+    const url = new URL(endpoint.endsWith("/translate") ? endpoint : `${endpoint}/translate`);
+    url.searchParams.set("api-version", "3.0");
+    url.searchParams.set("to", targetLang.toLowerCase());
+    if (sourceLang) url.searchParams.set("from", sourceLang.toLowerCase());
+    const headers = { "Content-Type": "application/json", "Ocp-Apim-Subscription-Key": apiKey };
+    if (settings.translatorRegion) headers["Ocp-Apim-Subscription-Region"] = settings.translatorRegion;
+    const response = await fetch(url, { method: "POST", headers, body: JSON.stringify([{ Text: text }]) });
+    if (!response.ok) throw new Error(`Microsoft Translator HTTP ${response.status}`);
+    return (await response.json()).flatMap((item) => item.translations || []).map((item) => item.text).filter(Boolean);
+  }
+  if (provider === "yandex") {
+    if (!apiKey) throw new Error("A Yandex Translate API key is required. Add it in the extension settings.");
+    if (!settings.translatorFolderId) throw new Error("A Yandex Cloud folder ID is required. Add it in the extension settings.");
+    const response = await fetch("https://translate.api.cloud.yandex.net/translate/v2/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Api-Key ${apiKey}` },
+      body: JSON.stringify({ folderId: settings.translatorFolderId, texts: [text], targetLanguageCode: targetLang.toLowerCase(), ...(sourceLang ? { sourceLanguageCode: sourceLang.toLowerCase() } : {}) })
+    });
+    if (!response.ok) throw new Error(`Yandex Translate HTTP ${response.status}`);
+    return (await response.json()).translations?.map((item) => item.text).filter(Boolean) || [];
   }
   if (provider === "libretranslate") {
     const response = await fetch(settings.translatorEndpoint || "https://libretranslate.com/translate", {
@@ -74,8 +124,35 @@ const translate = async (text, overrides = {}) => {
   return (await response.json()).translations?.map((item) => item.text).filter(Boolean) || [];
 };
 
+const translate = async (text, overrides = {}) => {
+  const settings = await getSettings();
+  const sourceLang = overrides.sourceLang ?? settings.sourceLang;
+  const targetLang = overrides.targetLang || settings.targetLang;
+  const cacheKey = JSON.stringify([settings.translationProvider, settings.translatorEndpoint, settings.translatorRegion, settings.translatorFolderId, settings.translatorApiKey || settings.deeplApiKey, sourceLang, targetLang, text]);
+  const cached = translationCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  if (translationRequests.has(cacheKey)) return translationRequests.get(cacheKey);
+  const request = translateWithSettings(settings, text, overrides)
+    .then((value) => {
+      translationCache.set(cacheKey, { value, expiresAt: Date.now() + 30000 });
+      return value;
+    })
+    .finally(() => translationRequests.delete(cacheKey));
+  translationRequests.set(cacheKey, request);
+  return request;
+};
+
 const refreshDecks = async () => ankiRequest("deckNames");
 const refreshModels = async () => ankiRequest("modelNames");
+
+const checkAnki = async () => {
+  try {
+    await ankiRequest("version");
+    return { running: true };
+  } catch {
+    return { running: false };
+  }
+};
 
 const findWordNotesInDeck = async (original, deck, translation = "") => {
   const searchText = original.replaceAll('"', '\\"');
@@ -95,14 +172,14 @@ const findWordDecks = async (original) => {
   return matches.filter(Boolean);
 };
 
-const checkApi = async () => {
-  const settings = await getSettings();
+const checkApi = async (overrides = {}) => {
+  const settings = { ...(await getSettings()), ...overrides };
   const provider = settings.translationProvider || "mymemory";
   const apiKey = settings.translatorApiKey || settings.deeplApiKey;
   if (provider === "mymemory") return "MyMemory does not require an API key.";
   if (!apiKey) return `An API key is required for ${provider}.`;
   try {
-    await translate("test", { sourceLang: "", targetLang: "EN" });
+    await translateWithSettings(settings, "test", { sourceLang: "", targetLang: "EN" });
     return "API key is valid.";
   } catch (error) {
     return error.message;
@@ -260,8 +337,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ decks: await refreshDecks() });
       } else if (message.type === "get-models") {
         sendResponse({ models: await refreshModels() });
+      } else if (message.type === "check-anki") {
+        sendResponse(await checkAnki());
       } else if (message.type === "check-api") {
-        sendResponse({ status: await checkApi() });
+        sendResponse({ status: await checkApi(message.settings || {}) });
       } else if (message.type === "get-settings") {
         const settings = await getSettings();
         sendResponse({ ...settings, translatorApiKey: settings.translatorApiKey || settings.deeplApiKey || "", deeplApiKey: settings.deeplApiKey || "" });
@@ -272,7 +351,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ ok: true });
       } else if (message.type === "get-highlights") {
         const settings = await getSettings();
-        sendResponse({ words: await syncWordsFromAnki(settings), decks: settings.highlightDecks, mode: settings.highlightMode, color: settings.highlightColor, opacity: settings.highlightOpacity, theme: settings.theme, siteWhitelist: settings.siteWhitelist, siteBlacklist: settings.siteBlacklist });
+        sendResponse({ words: await syncWordsFromAnki(settings), decks: settings.highlightDecks, mode: settings.highlightMode, wholeWords: settings.highlightWholeWords === true, color: settings.highlightColor, opacity: settings.highlightOpacity, theme: settings.theme, highlightEnabled: settings.highlightEnabled !== false, siteWhitelist: settings.siteWhitelist, siteBlacklist: settings.siteBlacklist });
       }
     } catch (error) {
       sendResponse({ error: error.message });

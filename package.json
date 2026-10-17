@@ -1,0 +1,10 @@
+{
+  "name": "ankifetch-translate",
+  "private": true,
+  "scripts": {
+    "test:visual": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0"
+  }
+}

@@ -11,7 +11,7 @@ Translation can be triggered by text selection, double-clicking selected text, t
 3. Open the extension settings, enter a DeepL API key, configure the AnkiConnect URL, load decks and models, and choose a save deck and card model.
 4. Select text on any page, use the popup or `Ctrl+Shift+Y`, and press **Add to Anki**.
 
-The extension does not embed API credentials in source code. DeepL credentials are stored in Chrome extension storage and sent only to the configured DeepL endpoint.
+The extension does not embed API credentials in source code. Translation credentials are stored in Chrome extension storage and sent only to the configured provider endpoint.
 
 ## AnkiConnect CORS
 

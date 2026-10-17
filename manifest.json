@@ -29,5 +29,11 @@
       "css": ["src/content.css"],
       "run_at": "document_idle"
     }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/locales/en.json", "src/locales/ru.json", "src/assets/icon.ico"],
+      "matches": ["<all_urls>"]
+    }
   ]
 }

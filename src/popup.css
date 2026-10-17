@@ -1,14 +1,29 @@
 :root { color-scheme: light; }
 * { box-sizing: border-box; }
-body { width: 380px; margin: 0; color: #202733; background: #f6f8fb; font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+html { overflow: hidden; border-radius: 14px; background: #f6f8fb; }
+body { width: 380px; margin: 0; overflow: hidden; border-radius: 14px; color: #202733; background: #f6f8fb; font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; scrollbar-color: #aeb8c6 transparent; scrollbar-width: thin; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: #aeb8c6; background-clip: padding-box; }
+*::-webkit-scrollbar-thumb:hover { background: #8996a8; background-clip: padding-box; }
 body[data-theme="dark"] { color-scheme: dark; color: #f1f4f8; background: #171c24; }
+html:has(body[data-theme="dark"]) { background: #171c24; }
+body[data-theme="dark"] { scrollbar-color: #596577 transparent; }
+body[data-theme="dark"] *::-webkit-scrollbar-thumb { background: #596577; background-clip: padding-box; }
+body[data-theme="dark"] *::-webkit-scrollbar-thumb:hover { background: #748197; background-clip: padding-box; }
 main { padding: 16px; }
 .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 h1 { margin: 0; font-size: 20px; font-weight: 700; }
 .topbar-actions { display: flex; align-items: center; gap: 6px; }
 .icon-button { width: 32px; height: 32px; padding: 2px; border: 1px solid #cbd2de; border-radius: 7px; background: #fff; color: #202733; cursor: pointer; font-size: 19px; line-height: 1; }
 .icon-button svg, .api-status-row svg { display: block; width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+.anki-status-button.is-running { color: #2f8f5b; }
+.anki-status-button.is-stopped { color: #c63d36; }
+.anki-status-button.is-checking { color: #8a94a3; }
 body[data-theme="dark"] .icon-button { border-color: #566171; background: #2b3442; color: #f1f4f8; }
+body[data-theme="dark"] .anki-status-button.is-running { color: #69c58d; }
+body[data-theme="dark"] .anki-status-button.is-stopped { color: #f07e75; }
+body[data-theme="dark"] .anki-status-button.is-checking { color: #aeb8c6; }
 .language-menu { position: relative; }
 .language-list { position: absolute; top: 34px; right: 0; z-index: 2; display: none; min-width: 120px; padding: 4px; border: 1px solid #cbd2de; border-radius: 7px; background: #fff; box-shadow: 0 5px 16px rgba(20, 30, 50, 0.2); }
 .language-menu.open .language-list { display: grid; gap: 3px; }
@@ -17,6 +32,8 @@ body[data-theme="dark"] .language-list { border-color: #566171; background: #2b3
 fieldset { margin: 20px 0 0; padding: 0; border: 0; }
 legend { padding: 0; font-size: 16px; font-weight: 750; }
 label { display: block; margin: 8px 0; font-weight: 600; }
+[hidden] { display: none !important; }
+.provider-field-hidden { display: none !important; }
 input, select { width: 100%; margin-top: 4px; padding: 7px; border: 1px solid #b9c2d0; border-radius: 6px; background: #fff; color: #202733; font: inherit; }
 textarea { width: 100%; margin-top: 4px; padding: 7px; resize: vertical; border: 1px solid #b9c2d0; border-radius: 6px; background: #fff; color: #202733; font: inherit; }
 body[data-theme="dark"] input, body[data-theme="dark"] select { border-color: #566171; background: #2b3442; color: #f1f4f8; }
@@ -34,6 +51,8 @@ input[type="range"] { padding: 0; accent-color: #2457d6; }
 .row label { min-width: 0; }
 button { border: 1px solid #b9c2d0; border-radius: 6px; padding: 7px 10px; background: #fff; color: #202733; cursor: pointer; font: inherit; }
 body[data-theme="dark"] button { border-color: #566171; background: #2b3442; color: #f1f4f8; }
+.shortcut-capture { display: block; width: 100%; margin-top: 4px; text-align: left; }
+.shortcut-capture.recording { border-color: #2457d6; box-shadow: 0 0 0 2px rgba(36, 87, 214, 0.18); }
 .hint, .status { min-height: 17px; color: #536174; font-size: 12px; }
 body[data-theme="dark"] .hint, body[data-theme="dark"] .status { color: #b8c2d0; }
 .status { color: #256c45; }
@@ -41,5 +60,7 @@ body[data-theme="dark"] .hint, body[data-theme="dark"] .status { color: #b8c2d0;
 .key-input input { min-width: 0; margin-top: 0; }
 .key-input button { flex: 0 0 auto; padding: 5px 8px; }
 .api-status-row { display: flex; align-items: center; gap: 5px; min-height: 22px; color: #536174; font-size: 12px; }
+.anki-status { margin: 6px 0 8px; color: #a13a31; font-size: 12px; white-space: pre-line; }
+body[data-theme="dark"] .anki-status { color: #e58a80; }
 .api-status-row button { width: 22px; height: 22px; padding: 4px; border: 0; background: transparent; }
 body[data-theme="dark"] .api-status-row { color: #b8c2d0; }
