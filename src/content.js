@@ -3,6 +3,8 @@ let pendingSave;
 let translationIcon;
 let popupRequestId = 0;
 let selectionTranslationToken = 0;
+let popupInteractionStarted = false;
+let doubleClickGuardUntil = 0;
 const TRANSLATION_ICON_PATH = "src/assets/icon.ico";
 const LANGUAGES = [
   ["", "Auto-detect"], ["AR", "Arabic"], ["BG", "Bulgarian"], ["CS", "Czech"], ["DA", "Danish"],
@@ -164,31 +166,73 @@ const getPopupAnchorRect = () => {
   return snapshotRect || null;
 };
 
+const positionPopup = (currentPopup, anchorRect = null) => {
+  currentPopup.style.visibility = "hidden";
+  const anchor = anchorRect || getPopupAnchorRect();
+  const popupRect = currentPopup.getBoundingClientRect();
+  const margin = 8;
+  const gap = 8;
+  if (!anchor) {
+    currentPopup.style.left = `${Math.max(margin, (window.innerWidth - popupRect.width) / 2) + window.scrollX}px`;
+    currentPopup.style.top = `${Math.max(margin, (window.innerHeight - popupRect.height) / 2) + window.scrollY}px`;
+  } else {
+    const anchorLeft = Number.isFinite(anchor.left) ? anchor.left : margin;
+    const anchorTop = Number.isFinite(anchor.top) ? anchor.top : margin;
+    const anchorBottom = Number.isFinite(anchor.bottom) ? anchor.bottom : margin;
+    const maxLeft = Math.max(margin, window.innerWidth - popupRect.width - margin);
+    const left = Math.min(maxLeft, Math.max(margin, anchorLeft));
+    const fitsBelow = anchorBottom + gap + popupRect.height <= window.innerHeight - margin;
+    const top = fitsBelow
+      ? anchorBottom + gap
+      : anchorTop - popupRect.height - gap >= margin
+        ? anchorTop - popupRect.height - gap
+        : Math.max(margin, window.innerHeight - popupRect.height - margin);
+    currentPopup.style.left = `${left + window.scrollX}px`;
+    currentPopup.style.top = `${top + window.scrollY}px`;
+  }
+  currentPopup.style.visibility = "visible";
+};
+
 const createPopup = async (original, translation, error = "", savedWord = null, anchorRect = null) => {
   removePopup();
   const requestId = ++popupRequestId;
   pendingSave = null;
   popup = document.createElement("aside");
   popup.className = "anki-translator-popup";
+  popupInteractionStarted = false;
+  popup.__translation = translation;
+  popup.__error = error;
+  popup.innerHTML = `<button type="button" class="anki-translator-close" aria-label="Close">×</button><div class="anki-translator-original"></div><div class="anki-translator-result"></div><div class="anki-translator-languages"><select class="anki-translator-source"></select><select class="anki-translator-target"></select></div><div class="anki-translator-anki-row"><label class="anki-translator-option"><input class="anki-translator-add" type="checkbox"> Add to Anki</label><select class="anki-translator-deck"></select></div>`;
+  popup.querySelector(".anki-translator-original").textContent = original;
+  popup.querySelector(".anki-translator-result").textContent = translation || (error ? "" : "Translating…");
+  document.body.appendChild(popup);
+  popup.addEventListener("pointerdown", (event) => {
+    popupInteractionStarted = true;
+    event.stopPropagation();
+  });
+  suppressEmptySelectionUntil = Date.now() + 500;
+  positionPopup(popup, anchorRect);
   const themeSettings = await send({ type: "get-settings" });
   if (requestId !== popupRequestId) return;
   popup.dataset.theme = themeSettings.theme || "light";
   let existingDecks = [];
   const locale = themeSettings.interfaceLanguage === "ru" ? "ru" : "en";
-  const translations = await fetch(chrome.runtime.getURL(`src/locales/${locale}.json`))
-    .then((response) => response.json())
-    .catch(() => ({}));
+  const [translations, ankiStatus] = await Promise.all([
+    fetch(chrome.runtime.getURL(`src/locales/${locale}.json`)).then((response) => response.json()).catch(() => ({})),
+    send({ type: "check-anki" })
+  ]);
   if (requestId !== popupRequestId) return;
-  const ankiStatus = await send({ type: "check-anki" });
-  if (requestId !== popupRequestId) return;
-  if (error) {
+  if (popup.__error) {
     const errorElement = document.createElement("div");
     errorElement.className = "anki-translator-error";
-    errorElement.textContent = error;
+    errorElement.textContent = popup.__error;
+    popup.querySelector(".anki-translator-result")?.remove();
+    popup.querySelector(".anki-translator-languages")?.remove();
+    popup.querySelector(".anki-translator-anki-row")?.remove();
     popup.append(errorElement);
   } else {
-    popup.innerHTML = `<button type="button" class="anki-translator-close" aria-label="${translations.close || "Close"}">×</button><div class="anki-translator-original"></div><div class="anki-translator-result"></div><div class="anki-translator-languages"><select class="anki-translator-source"></select><select class="anki-translator-target"></select></div><div class="anki-translator-anki-row"><label class="anki-translator-option"><input class="anki-translator-add" type="checkbox"> ${translations.addToAnki || "Add to Anki"}</label><select class="anki-translator-deck"></select></div>`;
-    popup.querySelector(".anki-translator-original").textContent = original;
+    popup.querySelector(".anki-translator-close").setAttribute("aria-label", translations.close || "Close");
+    popup.querySelector(".anki-translator-option").lastChild.textContent = ` ${translations.addToAnki || "Add to Anki"}`;
     const resultElement = popup.querySelector(".anki-translator-result");
     const deckSelect = popup.querySelector(".anki-translator-deck");
     const sourceSelect = popup.querySelector(".anki-translator-source");
@@ -196,11 +240,12 @@ const createPopup = async (original, translation, error = "", savedWord = null, 
     const languageOptions = LANGUAGES.map(([code, name]) => `<option value="${code}">${name}${code ? ` ${flagForLanguage(code)}` : ""}</option>`).join("");
     sourceSelect.innerHTML = languageOptions;
     targetSelect.innerHTML = languageOptions.replace('<option value="">Auto-detect</option>', "");
-    const decks = await send({ type: "get-decks" });
+    const [decks, existingResult] = await Promise.all([
+      send({ type: "get-decks" }),
+      send({ type: "find-word-decks", original })
+    ]);
     if (requestId !== popupRequestId) return;
     const availableDecks = decks.decks || [];
-    const existingResult = await send({ type: "find-word-decks", original });
-    if (requestId !== popupRequestId) return;
     existingDecks = existingResult.decks || [];
     const settings = themeSettings;
     const initialDeck = savedWord?.deck || settings.selectedDeck || availableDecks[0] || "";
@@ -212,7 +257,7 @@ const createPopup = async (original, translation, error = "", savedWord = null, 
     sourceSelect.value = settings.sourceLang || "";
     targetSelect.value = settings.targetLang || "EN";
     if (!targetSelect.value) targetSelect.value = "EN";
-    const translationValue = normalizeTranslations(translation)[0] || "";
+    const translationValue = normalizeTranslations(popup.__translation)[0] || "";
     resultElement.textContent = translationValue;
     const addCheckbox = popup.querySelector(".anki-translator-add");
     addCheckbox.checked = Boolean(savedWord || settings.popupAddToAnki);
@@ -261,41 +306,28 @@ const createPopup = async (original, translation, error = "", savedWord = null, 
     popup.append(statusElement);
   }
   if (requestId !== popupRequestId) return;
-  popup.style.visibility = "hidden";
-  document.body.appendChild(popup);
-  const anchor = anchorRect || getPopupAnchorRect();
-  const popupRect = popup.getBoundingClientRect();
-  const margin = 8;
-  const gap = 8;
-  if (!anchor) {
-    popup.style.left = `${Math.max(margin, (window.innerWidth - popupRect.width) / 2) + window.scrollX}px`;
-    popup.style.top = `${Math.max(margin, (window.innerHeight - popupRect.height) / 2) + window.scrollY}px`;
-    popup.style.visibility = "visible";
-  } else {
-    const anchorLeft = Number.isFinite(anchor?.left) ? anchor.left : margin;
-    const anchorTop = Number.isFinite(anchor?.top) ? anchor.top : margin;
-    const anchorBottom = Number.isFinite(anchor?.bottom) ? anchor.bottom : margin;
-    const maxLeft = Math.max(margin, window.innerWidth - popupRect.width - margin);
-    const left = Math.min(maxLeft, Math.max(margin, anchorLeft));
-    const fitsBelow = anchorBottom + gap + popupRect.height <= window.innerHeight - margin;
-    const top = fitsBelow
-      ? anchorBottom + gap
-      : anchorTop - popupRect.height - gap >= margin
-        ? anchorTop - popupRect.height - gap
-        : Math.max(margin, window.innerHeight - popupRect.height - margin);
-    popup.style.left = `${left + window.scrollX}px`;
-    popup.style.top = `${top + window.scrollY}px`;
-    popup.style.visibility = "visible";
-  }
+  positionPopup(popup, anchorRect);
   popup.addEventListener("click", (event) => {
     if (!event.target.closest(".anki-translator-deck-picker")) popup.querySelector(".anki-translator-deck-picker")?.classList.remove("open");
     event.stopPropagation();
   });
-  popup.addEventListener("pointerdown", (event) => event.stopPropagation());
   popup.addEventListener("keydown", () => popup.querySelector(".anki-translator-deck-picker")?.classList.remove("open"), true);
 };
 
 const showTranslation = async (original, translation, anchorRect = null) => createPopup(original, translation, "", null, anchorRect);
+
+const requestTranslationPopup = async (text, anchorRect = null, overrides = {}, translationStartedAt = performance.now(), isCurrent = () => true) => {
+  const response = await send({ type: "translate", text, ...overrides });
+  const providerResponseAt = performance.now();
+  if (!isCurrent()) return { response, currentPopup: null };
+  const popupPromise = createPopup(text, response.translation || "", response.error || "", null, anchorRect);
+  const currentPopup = popup;
+  currentPopup.dataset.translationStartedAt = String(translationStartedAt);
+  currentPopup.dataset.providerResponseAt = String(providerResponseAt);
+  currentPopup.dataset.popupVisibleAt = String(performance.now());
+  await popupPromise;
+  return { response, currentPopup };
+};
 
 const removeTranslationIcon = () => {
   translationIcon?.remove();
@@ -309,6 +341,16 @@ const closeContentMenus = () => {
 ["keydown", "keypress", "keyup", "input", "beforeinput"].forEach((eventName) => {
   window.addEventListener(eventName, closeContentMenus, true);
 });
+
+["input", "beforeinput"].forEach((eventName) => {
+  window.addEventListener(eventName, (event) => {
+    if (popup && !popup.contains(event.target)) popupInteractionStarted = true;
+  }, true);
+});
+
+window.addEventListener("keydown", (event) => {
+  if (popup && !popup.contains(event.target) && !["Control", "Alt", "Shift", "Meta"].includes(event.key)) popupInteractionStarted = true;
+}, true);
 
 const showTranslationIcon = (text, rect) => {
   if (!text || !rect) return;
@@ -339,10 +381,9 @@ const showTranslationIcon = (text, rect) => {
   translationIcon.addEventListener("click", async (event) => {
     event.preventDefault();
     event.stopPropagation();
+    const translationStartedAt = performance.now();
     removeTranslationIcon();
-    const response = await send({ type: "translate", text });
-    if (response.error) createPopup(text, "", response.error, null, rect);
-    else showTranslation(text, response.translation, rect);
+    await requestTranslationPopup(text, rect, {}, translationStartedAt);
   });
   document.body.appendChild(translationIcon);
 };
@@ -472,6 +513,8 @@ let pendingShortcutKeyDown = null;
 let suppressEmptySelectionUntil = 0;
 let suppressSelectionUntil = 0;
 let editablePointerDown = null;
+let lastPointerDownAt = 0;
+let lastPointerDownTarget = null;
 
 const isEditableTarget = (target) => target instanceof HTMLInputElement
   || target instanceof HTMLTextAreaElement
@@ -502,12 +545,14 @@ const selectedTextContextContains = (event) => {
 
 const translateSelectedText = async (text, event = null, force = false) => {
   const requestToken = ++selectionTranslationToken;
+  const translationStartedAt = performance.now();
   if (Date.now() < suppressSelectionUntil) return;
   const eventTarget = event?.target || null;
   if (popup?.contains(eventTarget) || eventTarget?.closest?.(".anki-translator-popup") || popup?.contains(window.getSelection()?.anchorNode)) return;
   if (browserFindActive) return;
   if (!text) {
     if (Date.now() < suppressEmptySelectionUntil) return;
+    if (popup && !popupInteractionStarted && !isEditableTarget(document.activeElement)) return;
     lastTranslatedSelection = "";
     removeTranslationIcon();
     if (popup) removePopup();
@@ -535,10 +580,10 @@ const translateSelectedText = async (text, event = null, force = false) => {
     if (activeShortcut) activeShortcut.shown = true;
   }
   if (settings.translationTrigger !== "selection") return;
-  const response = await send({ type: "translate", text });
-  if (requestToken !== selectionTranslationToken || Date.now() < suppressSelectionUntil) return;
-  if (response.error) createPopup(text, "", response.error, null, anchorRect);
-  else showTranslation(text, response.translation, anchorRect);
+  const { currentPopup } = await requestTranslationPopup(text, anchorRect, {}, translationStartedAt, () => requestToken === selectionTranslationToken && Date.now() >= suppressSelectionUntil);
+  if (requestToken !== selectionTranslationToken || Date.now() < suppressSelectionUntil) {
+    if (popup === currentPopup) removePopup();
+  }
 };
 
 document.addEventListener("pointerup", (event) => {
@@ -580,7 +625,7 @@ document.addEventListener("click", (event) => {
     });
     return;
   }
-  if (popup && !event.composedPath().includes(popup)) removePopup();
+  if (popup && Date.now() >= doubleClickGuardUntil && event.detail < 2 && !event.composedPath().includes(popup)) removePopup();
   if (!event.target.closest?.(".anki-translator-popup")) {
     setTimeout(() => {
       const text = getSelectedText();
@@ -595,6 +640,11 @@ document.addEventListener("click", (event) => {
 });
 
 document.addEventListener("pointerdown", (event) => {
+  const isDoubleClick = event.detail >= 2
+    || (event.target === lastPointerDownTarget && event.timeStamp - lastPointerDownAt < 500);
+  lastPointerDownAt = event.timeStamp;
+  lastPointerDownTarget = event.target;
+  if (isDoubleClick) doubleClickGuardUntil = Date.now() + 500;
   if (isEditableTarget(event.target) && (!popup || !event.composedPath().includes(popup))) {
     editablePointerDown = {
       moved: false,
@@ -608,7 +658,7 @@ document.addEventListener("pointerdown", (event) => {
     selectionModifierSnapshot = null;
   }
   if (event.target.closest?.(".anki-translator-highlight")) suppressEmptySelectionUntil = Date.now() + 500;
-  if (popup && !event.composedPath().includes(popup)) removePopup();
+  if (popup && !isDoubleClick && Date.now() >= doubleClickGuardUntil && !event.composedPath().includes(popup)) removePopup();
 });
 
 document.addEventListener("pointermove", () => {
@@ -624,6 +674,7 @@ document.addEventListener("dblclick", async (event) => {
   if (popup?.contains(event.target) || event.target.closest?.(".anki-translator-popup")) return;
   const text = getSelectedText();
   if (!text) return;
+  const translationStartedAt = performance.now();
   rememberSelectedText(text);
   const anchorRect = getPopupAnchorRect();
   setTimeout(() => {
@@ -636,16 +687,15 @@ document.addEventListener("dblclick", async (event) => {
     return;
   }
   if (settings.translationTrigger === "selection") {
+    if (settings.requireShortcut && settings.shortcutModifier && !shortcutIsHeld(settings, event)) return;
     suppressSelectionUntil = 0;
-    void translateSelectedText(text, event, true);
+    void requestTranslationPopup(text, anchorRect, {}, translationStartedAt);
     return;
   }
   if (settings.translationTrigger !== "double-click") return;
   if (!translationAllowed(settings)) return;
   if (settings.requireShortcut && settings.shortcutModifier && !shortcutIsHeld(settings, event)) return;
-  const response = await send({ type: "translate", text });
-  if (response.error) createPopup(text, "", response.error, null, anchorRect);
-  else showTranslation(text, response.translation, anchorRect);
+  await requestTranslationPopup(text, anchorRect, {}, translationStartedAt);
 }, true);
 
 const getShortcutDefinition = (shortcut) => {
@@ -695,14 +745,13 @@ const shortcutIsHeld = (settings, event = null) => {
 
 const showShortcutTranslation = async (text, shortcutState) => {
   if (!text || shortcutState.shown || popup) return;
+  const translationStartedAt = performance.now();
   shortcutState.shown = true;
   if (activeShortcut === shortcutState) activeShortcut = null;
   const anchorRect = getPopupAnchorRect();
   const settings = await send({ type: "get-settings" });
   if (!translationAllowed(settings)) return;
-  const response = await send({ type: "translate", text });
-  if (response.error) createPopup(text, "", response.error, null, anchorRect);
-  else showTranslation(text, response.translation, anchorRect);
+  await requestTranslationPopup(text, anchorRect, {}, translationStartedAt);
 };
 
 const shortcutText = (shortcutState) => shortcutState.textAtKeydown || getSelectedText() || selectedTextSnapshot;

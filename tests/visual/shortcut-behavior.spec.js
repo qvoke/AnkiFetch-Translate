@@ -11,16 +11,16 @@ const openConfiguredPage = async (url = "https://www.deepl.com/en/translator", s
     args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`]
   });
   const worker = context.serviceWorkers()[0] || await context.waitForEvent("serviceworker");
-  await worker.evaluate(async () => {
+  await worker.evaluate(async (testOverrides) => {
     await chrome.storage.local.set({
       shortcutModifier: "Ctrl",
       requireShortcut: true,
       translationTrigger: "selection",
       shortcutHoldDuration: 0,
       translationProvider: "mymemory",
-      ...overrides
+      ...testOverrides
     });
-  });
+  }, overrides);
   const page = await context.newPage();
   await page.goto(url, { waitUntil: "domcontentloaded" });
   if (url === "https://example.com/") {
